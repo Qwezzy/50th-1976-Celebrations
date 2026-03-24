@@ -1,0 +1,85 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User profile information including church and generation cohort.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "generationCohort": { "type": "string", "enum": ["Class of '76", "Bridge Generation", "Born-Free", "Rising Generation"] },
+        "churchId": { "type": "string" },
+        "churchName": { "type": "string" },
+        "dob": { "type": "string", "format": "date" },
+        "role": { "type": "string", "enum": ["Attendee", "Church Leader", "Admin", "Speaker"] },
+        "onboarded": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Church": {
+      "title": "Church",
+      "description": "Information about a local church in Soweto.",
+      "type": "object",
+      "properties": {
+        "churchId": { "type": "string" },
+        "churchName": { "type": "string" },
+        "wardLocation": { "type": "string" },
+        "affiliation": { "type": "string" },
+        "commemorationSundayCommitment": { "type": "boolean" },
+        "legacyFocusArea": { "type": "string" }
+      },
+      "required": ["churchId", "churchName"]
+    },
+    "EventSession": {
+      "title": "Event or Session",
+      "description": "A conference session or event.",
+      "type": "object",
+      "properties": {
+        "eventId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "speakerName": { "type": "string" },
+        "startTime": { "type": "string", "format": "date-time" },
+        "endTime": { "type": "string", "format": "date-time" },
+        "location": { "type": "string" }
+      },
+      "required": ["eventId", "title", "startTime"]
+    },
+    "Registration": {
+      "title": "Registration",
+      "description": "A user's registration for a specific session.",
+      "type": "object",
+      "properties": {
+        "registrationId": { "type": "string" },
+        "userId": { "type": "string" },
+        "eventId": { "type": "string" },
+        "checkInStatus": { "type": "boolean" },
+        "registeredAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["registrationId", "userId", "eventId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents."
+    },
+    "/churches/{churchId}": {
+      "schema": "Church",
+      "description": "Church information."
+    },
+    "/events_and_sessions/{eventId}": {
+      "schema": "EventSession",
+      "description": "Conference sessions."
+    },
+    "/registrations/{registrationId}": {
+      "schema": "Registration",
+      "description": "User session registrations."
+    }
+  }
+}

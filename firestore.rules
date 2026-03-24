@@ -1,0 +1,136 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (uid)
+    // Fields:
+    //   - uid: string (required)
+    //   - displayName: string
+    //   - email: string (required, email format)
+    //   - phone: string
+    //   - photoURL: string
+    //   - generationCohort: string (enum: ["Class of '76", "Bridge Generation", "Born-Free", "Rising Generation"])
+    //   - churchId: string
+    //   - churchName: string
+    //   - dob: string (date format)
+    //   - role: string (enum: ["Attendee", "Church Leader", "Admin", "Speaker"])
+    //   - onboarded: bool
+    //   - createdAt: timestamp
+    //   - updatedAt: timestamp
+    //
+    // Collection: churches
+    // Document ID: churchId
+    // Fields:
+    //   - churchId: string (required)
+    //   - churchName: string (required)
+    //   - wardLocation: string
+    //   - affiliation: string
+    //   - commemorationSundayCommitment: bool
+    //   - legacyFocusArea: string
+    //
+    // Collection: events_and_sessions
+    // Document ID: eventId
+    // Fields:
+    //   - eventId: string (required)
+    //   - title: string (required)
+    //   - description: string
+    //   - speakerName: string
+    //   - startTime: timestamp (required)
+    //   - endTime: timestamp
+    //   - location: string
+    //
+    // Collection: registrations
+    // Document ID: registrationId
+    // Fields:
+    //   - registrationId: string (required)
+    //   - userId: string (required)
+    //   - eventId: string (required)
+    //   - checkInStatus: bool
+    //   - registeredAt: timestamp
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin' ||
+          (request.auth.token.email == "Khwezi@khemo.co.za" && request.auth.token.email_verified == true));
+    }
+    
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasOnly(['uid', 'displayName', 'email', 'phone', 'photoURL', 'churchId', 'churchName', 'dob', 'generationCohort', 'role', 'onboarded', 'createdAt', 'updatedAt']) &&
+             data.uid is string &&
+             data.email is string && isValidEmail(data.email) &&
+             data.role in ["Attendee", "Church Leader", "Admin", "Speaker"] &&
+             (data.displayName == null || data.displayName is string) &&
+             (data.photoURL == null || data.photoURL is string);
+    }
+
+    function isValidChurch(data) {
+      return data.keys().hasOnly(['churchId', 'churchName', 'wardLocation', 'affiliation', 'commemorationSundayCommitment', 'legacyFocusArea']) &&
+             data.churchId is string && data.churchName is string && data.churchName.size() > 0;
+    }
+
+    function isValidEvent(data) {
+      return data.keys().hasOnly(['eventId', 'title', 'description', 'speakerName', 'startTime', 'endTime', 'location']) &&
+             data.eventId is string && data.title is string && data.startTime is timestamp;
+    }
+
+    function isValidRegistration(data) {
+      return data.keys().hasOnly(['registrationId', 'userId', 'eventId', 'checkInStatus', 'registeredAt']) &&
+             data.registrationId is string && data.userId is string && data.eventId is string;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == 'Attendee' || isAdmin());
+      allow update: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /churches/{churchId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /events_and_sessions/{eventId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /registrations/{registrationId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId && isValidRegistration(request.resource.data);
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.userId && isValidRegistration(request.resource.data);
+      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+    }
+
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}
